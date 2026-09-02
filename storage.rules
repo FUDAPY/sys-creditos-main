@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Bloquear todo por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Permitir comprobantes de pago
+    match /payments/{companyId}/{paymentId}/{allPaths=**} {
+      // Leer: ADMIN y el cobrador que hizo el pago
+      allow read: if request.auth != null;
+      
+      // Escribir: ADMIN y cobrador
+      allow write: if request.auth != null && 
+                      request.auth.token.email != null &&
+                      (request.auth.token.claims.role == 'ADMIN' || request.auth.token.claims.role == 'COBRADOR');
+    }
+
+    // Los archivos no pueden modificarse (solo crear y leer)
+    match /payments/{companyId}/{paymentId}/{document=**} {
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default": "sys-creditos-lingroup",
+    "sys-creditos-lingroup": "sys-creditos-lingroup",
+    "sys-creditos-linroup": "sys-creditos-lingroup",
+    "cx": "grupo-otelax-1"
+  },
+  "targets": {},
+  "etags": {}
+}

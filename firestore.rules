@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserDataSafe(companyId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin(companyId) {
+      let userData = getUserDataSafe(companyId);
+      return isAuthenticated() && userData != null && userData.role == 'ADMIN' && userData.isActive == true;
+    }
+
+    function isCollector(companyId) {
+      let userData = getUserDataSafe(companyId);
+      return isAuthenticated() && userData != null && userData.role == 'COLLECTOR' && userData.isActive == true;
+    }
+
+    function isStaff(companyId) {
+      return isAdmin(companyId) || isCollector(companyId);
+    }
+
+    function collectorCanApplyPaymentToLoan() {
+      return request.resource.data.companyId == resource.data.companyId &&
+        request.resource.data.clientId == resource.data.clientId &&
+        request.resource.data.approvalStatus == resource.data.approvalStatus &&
+        request.resource.data.currentBalance == resource.data.currentBalance &&
+        request.resource.data.totalAmount == resource.data.totalAmount &&
+        request.resource.data.paidAmount == resource.data.paidAmount &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'saldoInicial',
+          'saldoProvisorio',
+          'totalPendienteAprobacion',
+          'tienePagosPendientes',
+          'estadoCobranza',
+          'ultimoPagoPendienteAt',
+          'ultimoPagoPendienteId',
+          'updatedAt'
+        ]);
+    }
+
+    function validCollectorPaymentCreate(companyId) {
+      return request.resource.data.companyId == companyId &&
+        request.resource.data.collectorId == request.auth.uid &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.approvalStatus == 'PENDING' &&
+        request.resource.data.loanImpactApplied == false;
+    }
+
+    function hasAllFields(data, requiredFields) {
+      return data.keys().hasAll(requiredFields);
+    }
+
+    function validLoanCreate(companyId) {
+      return request.resource.data.companyId == companyId &&
+        hasAllFields(request.resource.data, [
+          'clientId',
+          'collectorId',
+          'collectorName',
+          'principal',
+          'currency',
+          'interestRate',
+          'loanType',
+          'totalAmount',
+          'paidAmount',
+          'currentBalance',
+          'status',
+          'approvalStatus',
+          'creditDate',
+          'grantedAt',
+          'expiresAt',
+          'commissionRate',
+          'createdAt',
+          'updatedAt',
+          'createdBy'
+        ]);
+    }
+
+    function validCollectorLoanCreate(companyId) {
+      return validLoanCreate(companyId) &&
+        request.resource.data.collectorId == request.auth.uid &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.approvalStatus == 'PENDING';
+    }
+
+    function validAdminLoanCreate(companyId) {
+      return validLoanCreate(companyId) &&
+        request.resource.data.approvalStatus == 'APPROVED';
+    }
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /users/{userId} {
+        allow read: if isStaff(companyId);
+        allow create: if isAuthenticated() && (request.auth.uid == userId || isAdmin(companyId));
+        allow update: if isAdmin(companyId);
+        allow delete: if isAdmin(companyId);
+      }
+
+      match /clients/{clientId} {
+        allow read: if isStaff(companyId);
+        allow create: if (isAdmin(companyId) ||
+          (isCollector(companyId) && request.resource.data.collectorId == request.auth.uid)) &&
+          hasAllFields(request.resource.data, ['fullName', 'documentId', 'phone', 'collectorId', 'collectorName', 'address', 'city', 'workplaceName', 'position', 'workPhone', 'seniority', 'references', 'location', 'createdAt', 'updatedAt', 'companyId', 'createdBy']);
+        allow update: if isAdmin(companyId);
+        allow delete: if isAdmin(companyId);
+      }
+
+      match /loans/{loanId} {
+        allow read: if isStaff(companyId);
+
+        allow create: if (isAdmin(companyId) && validAdminLoanCreate(companyId)) ||
+          (isCollector(companyId) && validCollectorLoanCreate(companyId));
+        allow update: if isAdmin(companyId) ||
+          (isCollector(companyId) && collectorCanApplyPaymentToLoan());
+        allow delete: if false;
+
+        match /payments/{paymentId} {
+          allow read: if isStaff(companyId);
+        allow create: if isAdmin(companyId) ||
+                          (isCollector(companyId) && validCollectorPaymentCreate(companyId));
+        allow update: if isAdmin(companyId);
+        allow delete: if isAdmin(companyId);
+      }
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isStaff(companyId);
+        allow create: if isAdmin(companyId) ||
+          (isCollector(companyId) && validCollectorPaymentCreate(companyId));
+        allow update: if isAdmin(companyId);
+        allow delete: if false;
+      }
+
+      match /collectionManagements/{managementId} {
+        allow read: if isStaff(companyId);
+        allow create: if isAdmin(companyId) ||
+          isCollector(companyId);
+        allow update: if isAdmin(companyId) ||
+          isCollector(companyId);
+        allow delete: if isAdmin(companyId);
+      }
+
+      match /pagares/{pagareId} {
+        allow read: if isStaff(companyId);
+        allow create, update, delete: if isAdmin(companyId);
+      }
+
+      match /slotMachineSites/{siteId} {
+        allow read: if isStaff(companyId);
+        allow create: if isAdmin(companyId);
+        allow update, delete: if isAdmin(companyId);
+      }
+
+      match /slotMachineEntries/{entryId} {
+        allow read: if isStaff(companyId);
+        allow create: if isAdmin(companyId) ||
+          (isCollector(companyId) && request.resource.data.collectorId == request.auth.uid);
+        allow update, delete: if isAdmin(companyId);
+      }
+
+      match /auditLogs/{logId} {
+        allow read: if isAdmin(companyId);
+        allow create: if isAuthenticated();
+        allow update, delete: if false;
+      }
+
+      match /settings/{doc=**} {
+        allow read: if isStaff(companyId);
+        allow write: if isAdmin(companyId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

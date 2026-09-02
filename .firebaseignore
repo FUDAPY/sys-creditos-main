@@ -1,0 +1,46 @@
+# Ignorar archivos que no necesitan subirse a Firebase
+
+# Dependencies
+node_modules/
+
+# Archivos de desarrollo
+.env
+.env.local
+.env.*.local
+
+# Source code
+src/
+tsconfig*.json
+eslint.config.js
+postcss.config.js
+tailwind.config.js
+vite.config.ts
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+firebase-debug.log
+*.log
+
+# Archivos temporales
+*.tmp
+
+# Package manager
+package-lock.json
+yarn.lock
+
+# Documentación markdown
+*.md
+
+# Archivos compilados y maps
+dist/**/*.map

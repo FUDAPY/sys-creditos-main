@@ -1,0 +1,37 @@
+{
+  "apps": [
+    {
+      "id": "sys-creditos-lingroup",
+      "name": "SysCreditos LIN GROUP",
+      "projectId": "sys-creditos-lingroup",
+      "serviceAccountPath": "./secrets/sys-creditos-lingroup-service-account.json",
+      "hosting": [
+        {
+          "id": "web",
+          "label": "Sitio principal",
+          "url": "https://sys-creditos-lingroup.web.app"
+        },
+        {
+          "id": "creditos",
+          "label": "Cartera de creditos",
+          "url": "https://sys-creditos-lingroup.web.app/creditos"
+        }
+      ],
+      "functions": [
+        {
+          "id": "health",
+          "label": "Health endpoint",
+          "url": "https://southamerica-east1-sys-creditos-lingroup.cloudfunctions.net/health"
+        }
+      ],
+      "firestore": {
+        "enabled": true,
+        "healthDocumentPath": "health/status"
+      },
+      "storage": {
+        "enabled": true,
+        "bucket": "sys-creditos-lingroup.firebasestorage.app"
+      }
+    }
+  ]
+}
