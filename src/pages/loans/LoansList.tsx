@@ -231,16 +231,15 @@ export default function LoansList() {
 
       setClients(clientsMap);
 
-      if (userData?.role === 'ADMIN') {
-        const usersSnap = await getDocs(
-          query(collection(db, `companies/${COMPANY_ID}/users`), where('isActive', '==', true))
-        );
-        setCollectors(
-          usersSnap.docs
-            .map((item) => item.data() as User)
-            .filter((user) => user.role === 'COLLECTOR' || user.role === 'ADMIN')
-        );
-      }
+      const usersSnap = await getDocs(
+        query(collection(db, `companies/${COMPANY_ID}/users`), where('isActive', '==', true))
+      );
+      setCollectors(
+        usersSnap.docs
+          .map((item) => item.data() as User)
+          .filter((user) => user.role === 'COLLECTOR' || user.role === 'ADMIN')
+          .sort((left, right) => left.name.localeCompare(right.name, 'es'))
+      );
     } catch (error) {
       console.error('Error cargando datos:', error);
       alert('Error al cargar la cartera de creditos.');
@@ -649,33 +648,24 @@ export default function LoansList() {
 
   return (
     <div className="space-y-6">
-      {userData?.role === 'ADMIN' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <button
-            onClick={() => setSelectedCollector('ALL')}
-            className={`px-4 py-2 rounded-md transition-colors ${
-              selectedCollector === 'ALL'
-                ? 'bg-blue-600 text-white font-semibold'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Todos ({loans.length})
-          </button>
+      <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+        <label htmlFor="portfolio-user-filter" className="text-sm font-semibold text-gray-700">
+          Filtrar por usuario
+        </label>
+        <select
+          id="portfolio-user-filter"
+          value={selectedCollector}
+          onChange={(event) => setSelectedCollector(event.target.value as string | 'ALL')}
+          className="min-w-[240px] rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700"
+        >
+          <option value="ALL">Todos los usuarios ({loans.length})</option>
           {collectors.map((collector) => (
-            <button
-              key={collector.uid}
-              onClick={() => setSelectedCollector(collector.uid)}
-              className={`px-4 py-2 rounded-md transition-colors text-sm ${
-                selectedCollector === collector.uid
-                  ? 'bg-blue-600 text-white font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
+            <option key={collector.uid} value={collector.uid}>
               {collector.name} ({loans.filter((loan) => loan.collectorId === collector.uid).length})
-            </button>
+            </option>
           ))}
-        </div>
-      )}
+        </select>
+      </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
         <div className="p-4 border-b bg-gray-50 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -806,13 +796,15 @@ export default function LoansList() {
             )
           )}
           <div className="mt-2 flex flex-wrap gap-2">
-            <ActionButton
-              onClick={() => setOpenAdminLoanId((current) => (current === group.groupKey ? null : group.groupKey))}
-              className="bg-slate-700 text-white hover:bg-slate-800"
-            >
-              Administrar
-            </ActionButton>
-            {openAdminLoanId === group.groupKey && (
+            {userData?.role === 'ADMIN' && (
+              <>
+                <ActionButton
+                  onClick={() => setOpenAdminLoanId((current) => (current === group.groupKey ? null : group.groupKey))}
+                  className="bg-slate-700 text-white hover:bg-slate-800"
+                >
+                  Administrar
+                </ActionButton>
+                {openAdminLoanId === group.groupKey && (
               <div className="basis-full mt-1 w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
                 {group.loans.map((item) => (
                   <div key={`admin-${item.id}`} className="rounded-lg border border-slate-200 p-2 mb-2 last:mb-0">
@@ -867,6 +859,8 @@ export default function LoansList() {
                   </div>
                 ))}
               </div>
+                )}
+              </>
             )}
           </div>
         </td>

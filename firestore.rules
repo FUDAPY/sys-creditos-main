@@ -26,11 +26,11 @@ service cloud.firestore {
     function collectorCanApplyPaymentToLoan() {
       return request.resource.data.companyId == resource.data.companyId &&
         request.resource.data.clientId == resource.data.clientId &&
-        request.resource.data.approvalStatus == resource.data.approvalStatus &&
-        request.resource.data.currentBalance == resource.data.currentBalance &&
-        request.resource.data.totalAmount == resource.data.totalAmount &&
-        request.resource.data.paidAmount == resource.data.paidAmount &&
-        request.resource.data.status == resource.data.status &&
+        request.resource.data.get('approvalStatus', 'APPROVED') == resource.data.get('approvalStatus', 'APPROVED') &&
+        request.resource.data.get('currentBalance', 0) == resource.data.get('currentBalance', 0) &&
+        request.resource.data.get('totalAmount', 0) == resource.data.get('totalAmount', 0) &&
+        request.resource.data.get('paidAmount', 0) == resource.data.get('paidAmount', 0) &&
+        request.resource.data.get('status', 'ACTIVE') == resource.data.get('status', 'ACTIVE') &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'saldoInicial',
           'saldoProvisorio',
