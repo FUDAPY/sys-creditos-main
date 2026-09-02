@@ -58,7 +58,7 @@ export const MainLayout = () => {
     if (location.pathname.startsWith('/clientes/') && location.pathname !== '/clientes/nuevo') {
       return 'Ficha del Cliente';
     }
-    if (location.pathname === '/creditos') return 'Cartera Activa';
+    if (location.pathname === '/creditos') return 'Creditos';
     if (location.pathname === '/cartera-activa') return 'Cartera Activa';
     if (location.pathname === '/tragamonedas') return 'Tragamonedas';
     if (location.pathname === '/pos') return 'POS';

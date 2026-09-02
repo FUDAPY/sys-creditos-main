@@ -187,7 +187,17 @@ export default function LoansList() {
         loadCollectionManagements(),
       ]);
       const approvedLoans = loansSnap.docs
-        .map((item) => ({ id: item.id, ...item.data() }) as Loan)
+        .map((item) => {
+          const data = item.data() as Loan & { approvalStatus?: string; status?: string; origen?: string };
+          const approvalStatus = String(data.approvalStatus || 'APPROVED').toUpperCase();
+          const status = String(data.status || '').toUpperCase();
+          return {
+            id: item.id,
+            ...data,
+            approvalStatus: approvalStatus === 'APROBADO' ? 'APPROVED' : data.approvalStatus,
+            status: status === 'ACTIVO' ? 'ACTIVE' : data.status,
+          } as Loan;
+        })
         .filter((loan) => {
           const status = String(loan.status || '').toUpperCase();
           const approvalStatus = String(loan.approvalStatus || 'APPROVED').toUpperCase();
@@ -262,7 +272,7 @@ export default function LoansList() {
           sectionOrigenFilter === 'ALL' ||
           loan.origen === sectionOrigenFilter ||
           (sectionOrigenFilter === 'sistema_creditos' &&
-            !loan.origen &&
+            (!loan.origen || ['credito', 'creditos'].includes(String(loan.origen).toLowerCase())) &&
             ['PRESTAMO', 'CELULAR', 'CONGELADO'].includes(String(loan.loanType))) ||
           (sectionOrigenFilter === 'empeno' && loan.loanType === 'EMPENO') ||
           (sectionOrigenFilter === 'alquiler' && loan.loanType === 'ALQUILER_INMUEBLE') ||
