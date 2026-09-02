@@ -45,6 +45,12 @@ export const loanTypeUsesDailyInterest = (loanType?: LoanType) =>
 export const loanTypeStartsFrozen = (loanType?: LoanType) =>
   loanType === 'PRESTACION_SERVICIOS';
 
+const isStandardCredit = (loan: Pick<Loan, 'origen' | 'status'> & { loanType?: LoanType }) =>
+  (loan.origen === undefined || loan.origen === 'sistema_creditos') &&
+  (loan.loanType === 'PRESTAMO' || loan.loanType === 'CELULAR') &&
+  loan.status !== 'FROZEN' &&
+  loan.status !== 'CONGELADO';
+
 export const calculateInterestAmount = (
   loan: Pick<Loan, 'principal' | 'interestRate'> & { loanType?: LoanType }
 ) => {
@@ -56,7 +62,7 @@ export const calculateInterestAmount = (
 };
 
 export const calculateDaysLate = (
-  loan: Pick<Loan, 'expiresAt' | 'status' | 'approvalStatus'>,
+  loan: Pick<Loan, 'expiresAt' | 'nextDueDate' | 'status' | 'approvalStatus'>,
   referenceTime = Date.now()
 ) => {
   if (
@@ -68,7 +74,7 @@ export const calculateDaysLate = (
   }
 
   const referenceDay = startOfUtcDay(referenceTime);
-  const dueDay = startOfUtcDay(loan.expiresAt);
+  const dueDay = startOfUtcDay(loan.nextDueDate || loan.expiresAt);
 
   if (referenceDay <= dueDay) {
     return 0;
@@ -123,17 +129,10 @@ export const getCollectionDayIndicator = (
 };
 
 export const calculateDailyInterestAmount = (
-  loan: Pick<Loan, 'principal' | 'interestRate' | 'totalAmount' | 'montoCuota'> & { loanType?: LoanType }
+  loan: Pick<Loan, 'principal' | 'interestRate' | 'totalAmount' | 'montoCuota' | 'origen' | 'status'> & { loanType?: LoanType }
 ) => {
-  if (!loanTypeUsesDailyInterest(loan.loanType)) return 0;
-
-  // Si tiene cuota mensual configurada (ej: 1.000.000), la mora diaria es (cuota / 30)
-  if (loan.montoCuota && loan.montoCuota > 0) {
-    return Math.round(loan.montoCuota / 30);
-  }
-
-  // fallback
-  return 0;
+  if (!isStandardCredit(loan)) return 0;
+  return calculateInterestAmount(loan) / 30;
 };
 export const calculatePendingRefinancing = (loan: Loan) => ({
   cyclesToApply: 0,
@@ -145,16 +144,24 @@ export const calculatePendingRefinancing = (loan: Loan) => ({
 export const accrueLoanState = (loan: Loan, referenceTime = Date.now()) => {
   const principalBalance = normalizePrincipalBalance(loan);
   const interestPerCycle = calculateInterestAmount(loan);
+  const currentDueDate = loan.nextDueDate || loan.expiresAt;
   const daysLate = calculateDaysLate(loan, referenceTime);
+  const cycleDays = getLoanCycleDays(loan);
+  const cyclesElapsed =
+    isStandardCredit(loan) && referenceTime >= currentDueDate
+      ? Math.floor((startOfUtcDay(referenceTime) - startOfUtcDay(currentDueDate)) / (cycleDays * DAY_MS)) + 1
+      : 0;
   const dailyInterest = calculateDailyInterestAmount(loan);
-  const overdueInterestCharged = dailyInterest * daysLate;
+  const overdueInterestCharged = Math.round(dailyInterest * daysLate);
   const interestPaidAmount = Math.max(0, loan.interestPaidAmount || 0);
   const overdueInterestPaid = Math.min(interestPaidAmount, overdueInterestCharged);
   const initialInterestPaid = Math.max(0, interestPaidAmount - overdueInterestPaid);
   const accruedLateFeeBalance = Math.max(0, overdueInterestCharged - overdueInterestPaid);
+  const recurringInterest = isStandardCredit(loan) ? interestPerCycle * cyclesElapsed : 0;
   const accruedInterestBalance =
-    principalBalance > 0 ? Math.max(0, interestPerCycle - initialInterestPaid) : 0;
-  const currentDueDate = loan.expiresAt;
+    principalBalance > 0
+      ? Math.max(0, interestPerCycle + recurringInterest - initialInterestPaid)
+      : 0;
 
   if (
     loan.status === 'FROZEN' ||
@@ -168,7 +175,7 @@ export const accrueLoanState = (loan: Loan, referenceTime = Date.now()) => {
       nextDueDate: loan.expiresAt,
       currentDueDate,
       lastAccruedAt: loan.lastAccruedAt || loan.expiresAt,
-      chargedCycles: 0,
+      chargedCycles: cyclesElapsed,
       interestPerCycle,
     };
   }
@@ -179,7 +186,7 @@ export const accrueLoanState = (loan: Loan, referenceTime = Date.now()) => {
     nextDueDate: loan.expiresAt,
     currentDueDate,
     lastAccruedAt: referenceTime,
-    chargedCycles: 0,
+    chargedCycles: cyclesElapsed,
     interestPerCycle,
   };
 };
