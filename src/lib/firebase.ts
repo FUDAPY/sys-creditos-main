@@ -5,13 +5,13 @@ import { getFunctions } from 'firebase/functions';
 import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA_yQjBTGDLNe54GlQ8caNV9BjOCukzTjI",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "sys-creditos-lingroup.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "sys-creditos-lingroup",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "sys-creditos-lingroup.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "107630664084",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:107630664084:web:532c7c3f59ae63a7c61781",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-KFYZZ8ZZGZ"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -21,5 +21,4 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app, 'southamerica-east1');
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// Hardcodeamos el ID de la empresa por ahora para evitar errores si falta el .env
-export const COMPANY_ID = "lin_group_sa_001";
+export const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
