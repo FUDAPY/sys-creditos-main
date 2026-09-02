@@ -296,20 +296,45 @@ export default function PaymentApprovals() {
     setProcessingBulk(true);
     setActionError(null);
     try {
+      const approved: string[] = [];
+      const failed: string[] = [];
+
       for (const settlementId of selectedPaymentIds) {
         const [kind, itemId] = settlementId.split(':');
-        if (kind === 'PAYMENT') {
-          await approvePayment(itemId, userData.uid, userData.name);
-          await syncFinancialPayment(itemId);
-        }
-        if (kind === 'SLOT_MACHINE') {
-          await approveSlotMachineEntry(itemId, userData.uid, userData.name);
+        const payment = payments.find((item) => item.id === itemId);
+        const slotEntry = slotMachineEntries.find((item) => item.id === itemId);
+        const who = payment
+          ? `Cliente: ${payment.clientName || clientsById[payment.clientId] || payment.clientId}; Cobrador: ${payment.collectorName || 'Sin cobrador'}`
+          : slotEntry
+            ? `Ubicacion: ${slotEntry.locationName}; Cobrador: ${slotEntry.collectorName || 'Sin cobrador'}`
+            : `ID: ${itemId}`;
+
+        try {
+          if (kind === 'PAYMENT') {
+            await approvePayment(itemId, userData.uid, userData.name);
+            await syncFinancialPayment(itemId);
+            approved.push(`Cobro ${who}`);
+          } else if (kind === 'SLOT_MACHINE') {
+            await approveSlotMachineEntry(itemId, userData.uid, userData.name);
+            approved.push(`Tragamonedas ${who}`);
+          }
+        } catch (itemError) {
+          const reason = itemError instanceof Error ? itemError.message : 'Error desconocido';
+          failed.push(`${kind === 'PAYMENT' ? 'Cobro' : 'Tragamonedas'} ${who}; Motivo: ${reason}`);
         }
       }
       await loadPendingPayments();
+      if (failed.length > 0) {
+        setActionError(
+          `Aprobadas: ${approved.length}. No aprobadas: ${failed.length}.\n\n` +
+          failed.map((item, index) => `${index + 1}. ${item}`).join('\n')
+        );
+      } else {
+        alert(`Rendiciones aprobadas correctamente: ${approved.length}.`);
+      }
     } catch (error) {
       console.error('Error aprobando rendicion:', error);
-      setActionError('No se pudo aprobar la rendicion seleccionada.');
+      setActionError(error instanceof Error ? error.message : 'No se pudo procesar la rendicion seleccionada.');
     } finally {
       setProcessingBulk(false);
     }

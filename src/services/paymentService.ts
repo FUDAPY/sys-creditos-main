@@ -256,15 +256,41 @@ export const approvePayment = async (
     if (!loanImpactAlreadyApplied) {
       const effectivePaidAt = payment.paidAt || payment.createdAt || Date.now();
       const projected = accrueLoanState(loan, effectivePaidAt);
-      const allocation = applyPaymentByType(
-        {
-          principalBalance: projected.principalBalance,
-          accruedInterestBalance: projected.accruedInterestBalance,
-          accruedLateFeeBalance: projected.accruedLateFeeBalance,
-        },
-        payment.amount || 0,
-        payment.paymentType || 'MIXED'
-      );
+      const storedPrincipalApplied = Math.max(0, payment.principalApplied || 0);
+      const storedInterestApplied = Math.max(0, payment.interestApplied || 0);
+      const storedLateFeeApplied = Math.max(0, payment.arrearsApplied || 0);
+      const storedAllocationTotal =
+        storedPrincipalApplied + storedInterestApplied + storedLateFeeApplied;
+      const hasStoredAllocation =
+        storedAllocationTotal === Math.max(0, payment.amount || 0);
+      const allocation = hasStoredAllocation
+        ? {
+            lateFeeApplied: storedLateFeeApplied,
+            interestApplied: storedInterestApplied,
+            principalApplied: storedPrincipalApplied,
+            resultingPrincipalBalance: Math.max(
+              0,
+              projected.principalBalance - storedPrincipalApplied
+            ),
+            resultingInterestBalance: Math.max(
+              0,
+              projected.accruedInterestBalance - storedInterestApplied
+            ),
+            resultingLateFeeBalance: Math.max(
+              0,
+              projected.accruedLateFeeBalance - storedLateFeeApplied
+            ),
+            maxAllowed: payment.amount || 0,
+          }
+        : applyPaymentByType(
+            {
+              principalBalance: projected.principalBalance,
+              accruedInterestBalance: projected.accruedInterestBalance,
+              accruedLateFeeBalance: projected.accruedLateFeeBalance,
+            },
+            payment.amount || 0,
+            payment.paymentType || 'MIXED'
+          );
 
       if ((payment.amount || 0) > allocation.maxAllowed) {
         throw new Error('El monto pendiente supera la deuda actual del credito.');

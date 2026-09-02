@@ -37,13 +37,18 @@ export const getLoanCycleMonths = (loan: Pick<Loan, 'cycleDays' | 'grantedAt' | 
   getCalendarMonthSpanFromDays(getLoanCycleDays(loan));
 
 export const loanTypeUsesInitialInterest = (loanType?: LoanType) =>
-  loanType !== 'ALQUILER_INMUEBLE' && loanType !== 'PRESTACION_SERVICIOS';
+  loanType !== 'ALQUILER_INMUEBLE' &&
+  loanType !== 'PRESTACION_SERVICIOS' &&
+  loanType !== 'CONGELADO';
 
 export const loanTypeUsesDailyInterest = (loanType?: LoanType) =>
   loanType !== 'CONGELADO';
 
 export const loanTypeStartsFrozen = (loanType?: LoanType) =>
   loanType === 'PRESTACION_SERVICIOS';
+
+const isFrozenLoan = (loan: { loanType?: LoanType; status?: Loan['status'] }) =>
+  loan.status === 'FROZEN' || loan.status === 'CONGELADO' || loan.loanType === 'CONGELADO';
 
 const isStandardCredit = (loan: Pick<Loan, 'origen' | 'status'> & { loanType?: LoanType }) =>
   (loan.origen === undefined || loan.origen === 'sistema_creditos') &&
@@ -52,9 +57,9 @@ const isStandardCredit = (loan: Pick<Loan, 'origen' | 'status'> & { loanType?: L
   loan.status !== 'CONGELADO';
 
 export const calculateInterestAmount = (
-  loan: Pick<Loan, 'principal' | 'interestRate'> & { loanType?: LoanType }
+  loan: Pick<Loan, 'principal' | 'interestRate'> & { loanType?: LoanType; status?: Loan['status'] }
 ) => {
-  if (!loanTypeUsesInitialInterest(loan.loanType)) {
+  if (!loanTypeUsesInitialInterest(loan.loanType) || isFrozenLoan(loan)) {
     return 0;
   }
   const rate = loan.interestRate >= 0 ? loan.interestRate : DEFAULT_INTEREST_RATE;
@@ -65,11 +70,7 @@ export const calculateDaysLate = (
   loan: Pick<Loan, 'expiresAt' | 'nextDueDate' | 'status' | 'approvalStatus'>,
   referenceTime = Date.now()
 ) => {
-  if (
-    loan.status === 'FROZEN' ||
-    loan.status === 'PAID' ||
-    (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')
-  ) {
+    if (isFrozenLoan(loan) || loan.status === 'PAID' || (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')) {
     return 0;
   }
 
@@ -89,11 +90,7 @@ export const getCollectionDayIndicator = (
   },
   referenceTime = Date.now()
 ) => {
-  if (
-    loan.status === 'FROZEN' ||
-    loan.status === 'PAID' ||
-    (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')
-  ) {
+    if (isFrozenLoan(loan) || loan.status === 'PAID' || (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')) {
     return {
       mode: 'neutral' as const,
       value: 0,
@@ -164,10 +161,8 @@ export const accrueLoanState = (loan: Loan, referenceTime = Date.now()) => {
       : 0;
 
   if (
-    loan.status === 'FROZEN' ||
-    loan.status === 'PAID' ||
-    (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')
-  ) {
+      isFrozenLoan(loan) || loan.status === 'PAID' || (loan.approvalStatus && loan.approvalStatus !== 'APPROVED')
+    ) {
     return {
       principalBalance,
       accruedInterestBalance,
